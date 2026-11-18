@@ -1,102 +1,33 @@
-let marcasFrota = JSON.parse(localStorage.getItem('frota_marcas_v11')) || {
+// ==========================================
+// CONFIGURAÇÃO DO SUPABASE (Nuvem)
+// ==========================================
+const SUPABASE_URL = https://inycfnsqlfrbjjqntntf.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_n3LZUyyX5ju5DDfkfhblzQ_jn-h_Hsk';
+
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Estrutura padrão inicial caso o banco venha vazio
+let marcasFrota = {
     "Volkswagen": {
         logo: "https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg",
-        caminhoes: [
-            {
-                id: 101,
-                marca: "Volkswagen",
-                modelo: "VW Constellation 24.280",
-                placa: "VWX-1234",
-                status: "Alocado",
-                localAtual: "Centro de Distribuição - PE",
-                motorista: "José Carlos",
-                empresaAluguel: "Logística Nordeste",
-                valorAluguelMensal: 8500.00,
-                paradaProgramada: { ativa: true, data: "2026-12-10", motivo: "Revisão geral de freios" },
-                manutencoes: [
-                    {
-                        idManutencao: 1,
-                        pecaTrocada: "Pastilhas de Freio",
-                        servicoFeito: "Substituição completa",
-                        dataEntrada: "2026-02-01",
-                        dataSaida: "2026-02-02",
-                        custoPeca: 400.00,
-                        custoMaoObra: 150.00,
-                        mecanico: "João da Oficina",
-                        oficina: "Mecânica Pesada Sul",
-                        cidade: "Poços de Caldas",
-                        estado: "MG"
-                    }
-                ],
-                pecasDesgaste: ["Filtros", "Óleo", "Pneus", "Pastilhas"],
-                valoresDesgaste: [30, 40, 20, 10]
-            }
-        ]
+        caminhoes: []
     },
     "Ford": {
         logo: "https://upload.wikimedia.org/wikipedia/commons/3/3e/Ford_logo_flat.svg",
-        caminhoes: [
-            {
-                id: 201,
-                marca: "Ford",
-                modelo: "Ford Cargo 2429",
-                placa: "FOR-5678",
-                status: "Em Manutenção",
-                localAtual: "Oficina Central - Agrovila",
-                motorista: "Roberto Dias",
-                empresaAluguel: "Construtora Agrovila",
-                valorAluguelMensal: 7200.00,
-                paradaProgramada: { ativa: false, data: "", motivo: "" },
-                manutencoes: [],
-                pecasDesgaste: ["Embreagem", "Freios", "Óleo", "Correias"],
-                valoresDesgaste: [70, 20, 5, 5]
-            }
-        ]
+        caminhoes: []
     },
     "Mercedes-Benz": {
         logo: "https://upload.wikimedia.org/wikipedia/commons/9/90/Mercedes-Logo.svg",
-        caminhoes: [
-            {
-                id: 301,
-                marca: "Mercedes-Benz",
-                modelo: "Mercedes Actros 2651",
-                placa: "MBZ-9999",
-                status: "Alocado",
-                localAtual: "Transporte de Cana - Usina",
-                motorista: "Antônio Carlos",
-                empresaAluguel: "Usina São José",
-                valorAluguelMensal: 12000.00,
-                paradaProgramada: { ativa: false, data: "", motivo: "" },
-                manutencoes: [],
-                pecasDesgaste: ["Pneus", "Óleo", "Freios", "Filtros"],
-                valoresDesgaste: [50, 30, 15, 5]
-            }
-        ]
+        caminhoes: []
     }
 };
 
-let funcionarios = JSON.parse(localStorage.getItem('frota_funcionarios_v3')) || [
-    {
-        id: 1,
-        nome: "José Carlos",
-        cpf: "123.456.789-00",
-        celular: "(81) 99888-7766",
-        admissao: "2024-01-15",
-        cnhCat: "D + EAR",
-        cnhValidade: "2027-08-15",
-        salario: 3500.00,
-        feriasInicio: "2026-07-01",
-        feriasFim: "2026-07-30",
-        afastamentoMotivo: "Nenhum",
-        afastamentoDias: 0,
-        atestados: "1 atestado"
-    }
-];
-
-let contasAcesso = JSON.parse(localStorage.getItem('frota_contas_v2')) || [
+let funcionarios = [];
+let contasAcesso = [
     { id: 1, usuario: "Marcelo Barros", senha: "1234" }
 ];
 
+// Elementos da Tela
 const brandsGrid = document.getElementById('brandsGrid');
 const loginModal = document.getElementById('loginModal');
 const adminDashboardModal = document.getElementById('adminDashboardModal');
@@ -129,6 +60,94 @@ let graficoResumoGeralInstance = null;
 let graficoFinanceiroInstance = null;
 let graficoFinanceiroGeralInstance = null;
 
+// ==========================================
+// FUNÇÕES DE CARREGAMENTO DO SUPABASE
+// ==========================================
+async function carregarDadosDoSupabase() {
+    try {
+        // Buscar Caminhões
+        const { data: dadosCaminhoes, error: errCaminhoes } = await supabaseClient.from('caminhoes').select('*');
+        if (!errCaminhoes && dadosCaminhoes) {
+            // Limpa e reorganiza nas marcas
+            Object.keys(marcasFrota).forEach(m => marcasFrota[m].caminhoes = []);
+            
+            for (let c of dadosCaminhoes) {
+                // Buscar manutenções de cada caminhão
+                const { data: dadosManut } = await supabaseClient
+                    .from('manutencoes')
+                    .select('*')
+                    .eq('caminhao_id', c.id);
+
+                const caminhaoFormatado = {
+                    id: c.id,
+                    marca: c.marca,
+                    modelo: c.modelo,
+                    placa: c.placa,
+                    status: c.status,
+                    localAtual: c.local_atual,
+                    motorista: c.motorista,
+                    empresaAluguel: c.empresa_aluguel,
+                    valorAluguelMensal: c.valor_aluguel_mensal,
+                    foto: c.foto,
+                    paradaProgramada: c.parada_programada || { ativa: false, data: "", motivo: "" },
+                    manutencoes: dadosManut ? dadosManut.map(m => ({
+                        idManutencao: m.id_manutencao,
+                        pecaTrocada: m.peca_trocada,
+                        servicoFeito: m.servico_feito,
+                        mecanico: m.mecanico,
+                        oficina: m.oficina,
+                        cidade: m.cidade,
+                        estado: m.estado,
+                        dataEntrada: m.data_entrada,
+                        dataSaida: m.data_saida,
+                        custoPeca: m.custo_peca,
+                        custoMaoObra: m.custo_mao_obra
+                    })) : [],
+                    pecasDesgaste: c.pecas_desgaste || [],
+                    valoresDesgaste: c.valores_desgaste || []
+                };
+
+                if (marcasFrota[c.marca]) {
+                    marcasFrota[c.marca].caminhoes.push(caminhaoFormatado);
+                }
+            }
+        }
+
+        // Buscar Funcionários
+        const { data: dadosFunc, error: errFunc } = await supabaseClient.from('funcionarios').select('*');
+        if (!errFunc && dadosFunc) {
+            funcionarios = dadosFunc.map(f => ({
+                id: f.id,
+                nome: f.nome,
+                cpf: f.cpf,
+                celular: f.celular,
+                admissao: f.admissao,
+                cnhCat: f.cnh_cat,
+                cnhValidade: f.cnh_validade,
+                salario: f.salario,
+                feriasInicio: f.ferias_inicio,
+                feriasFim: f.ferias_fim,
+                afastamentoMotivo: f.afastamento_motivo,
+                afastamentoDias: f.afastamento_dias,
+                atestados: f.atestados
+            }));
+        }
+
+        // Buscar Contas
+        const { data: dadosContas, error: errContas } = await supabaseClient.from('contas_acesso').select('*');
+        if (!errContas && dadosContas && dadosContas.length > 0) {
+            contasAcesso = dadosContas;
+        }
+
+        renderBrands();
+    } catch (erro) {
+        console.error("Erro ao sincronizar com Supabase:", erro);
+    }
+}
+
+// ==========================================
+// RENDERIZAÇÃO E INTERFACE
+// ==========================================
 function renderBrands() {
     brandsGrid.innerHTML = "";
     Object.keys(marcasFrota).forEach(nomeMarca => {
@@ -478,75 +497,62 @@ function abrirEdicaoCaminhao(id) {
     editTruckModal.classList.add('active');
     renderizarGraficoManutencao(caminhao);
 
-    document.getElementById('formGeralCaminhao').addEventListener('submit', (e) => {
+    document.getElementById('formGeralCaminhao').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const novaMarca = document.getElementById('editMarca').value;
-        const novoModelo = document.getElementById('editModelo').value;
-        const novaPlaca = document.getElementById('editPlaca').value;
-        const novaFoto = document.getElementById('editFoto').value;
-        const novoStatus = document.getElementById('editStatus').value;
-        const novoLocal = document.getElementById('editLocal').value;
-        const novoMotorista = document.getElementById('editMotorista').value;
-        const novaEmpresa = document.getElementById('editEmpresa').value;
+        caminhao.marca = document.getElementById('editMarca').value;
+        caminhao.modelo = document.getElementById('editModelo').value;
+        caminhao.placa = document.getElementById('editPlaca').value;
+        caminhao.foto = document.getElementById('editFoto').value;
+        caminhao.status = document.getElementById('editStatus').value;
+        caminhao.localAtual = document.getElementById('editLocal').value;
+        caminhao.motorista = document.getElementById('editMotorista').value;
+        caminhao.empresaAluguel = document.getElementById('editEmpresa').value;
 
-        if (novaMarca !== marcaAtual) {
-            marcasFrota[marcaAtual].caminhoes = marcasFrota[marcaAtual].caminhoes.filter(c => c.id !== id);
-            caminhao.marca = novaMarca;
-            caminhao.modelo = novoModelo;
-            caminhao.placa = novaPlaca;
-            caminhao.foto = novaFoto;
-            caminhao.status = novoStatus;
-            caminhao.localAtual = novoLocal;
-            caminhao.motorista = novoMotorista;
-            caminhao.empresaAluguel = novaEmpresa;
+        // Salvar no Supabase
+        await supabaseClient.from('caminhoes').upsert([{
+            id: caminhao.id,
+            marca: caminhao.marca,
+            modelo: caminhao.modelo,
+            placa: caminhao.placa,
+            status: caminhao.status,
+            local_atual: caminhao.localAtual,
+            motorista: caminhao.motorista,
+            empresa_aluguel: caminhao.empresaAluguel,
+            valor_aluguel_mensal: caminhao.valorAluguelMensal,
+            foto: caminhao.foto,
+            parada_programada: caminhao.paradaProgramada
+        }]);
 
-            if (!marcasFrota[novaMarca]) marcasFrota[novaMarca] = { caminhoes: [] };
-            marcasFrota[novaMarca].caminhoes.push(caminhao);
-        } else {
-            caminhao.modelo = novoModelo;
-            caminhao.placa = novaPlaca;
-            caminhao.foto = novaFoto;
-            caminhao.status = novoStatus;
-            caminhao.localAtual = novoLocal;
-            caminhao.motorista = novoMotorista;
-            caminhao.empresaAluguel = novaEmpresa;
-        }
-
-        localStorage.setItem('frota_marcas_v11', JSON.stringify(marcasFrota));
-        alert("Informações do veículo atualizadas com sucesso!");
+        alert("Atualizado na nuvem com sucesso!");
+        await carregarDadosDoSupabase();
         renderBrands();
         renderizarTodosCaminhoesAdmin();
         editTruckModal.classList.remove('active');
     });
 
-    document.getElementById('formAdicionarManutencao').addEventListener('submit', (e) => {
+    document.getElementById('formAdicionarManutencao').addEventListener('submit', async (e) => {
         e.preventDefault();
         const idManutencaoEditando = document.getElementById('editIdManutencao').value;
 
         const dadosManutencao = {
-            idManutencao: idManutencaoEditando ? parseInt(idManutencaoEditando) : Date.now(),
-            pecaTrocada: document.getElementById('mPeca').value,
-            servicoFeito: document.getElementById('mServico').value,
+            id_manutencao: idManutencaoEditando ? parseInt(idManutencaoEditando) : Date.now(),
+            caminhao_id: caminhao.id,
+            peca_trocada: document.getElementById('mPeca').value,
+            servico_feito: document.getElementById('mServico').value,
             mecanico: document.getElementById('mMecanico').value,
             oficina: document.getElementById('mOficina').value,
             cidade: document.getElementById('mCidade').value,
             estado: document.getElementById('mEstado').value,
-            dataEntrada: document.getElementById('mDataEntrada').value,
-            dataSaida: document.getElementById('mDataSaida').value,
-            custoPeca: parseFloat(document.getElementById('mCustoPeca').value) || 0,
-            custoMaoObra: parseFloat(document.getElementById('mCustoMao').value) || 0
+            data_entrada: document.getElementById('mDataEntrada').value,
+            data_saida: document.getElementById('mDataSaida').value,
+            custo_peca: parseFloat(document.getElementById('mCustoPeca').value) || 0,
+            custo_mao_obra: parseFloat(document.getElementById('mCustoMao').value) || 0
         };
 
-        if (idManutencaoEditando) {
-            const index = caminhao.manutencoes.findIndex(m => m.idManutencao === parseInt(idManutencaoEditando));
-            if (index !== -1) caminhao.manutencoes[index] = dadosManutencao;
-            alert("Manutenção atualizada com sucesso!");
-        } else {
-            caminhao.manutencoes.unshift(dadosManutencao);
-            alert("Manutenção registrada com sucesso!");
-        }
+        await supabaseClient.from('manutencoes').upsert([dadosManutencao]);
 
-        localStorage.setItem('frota_marcas_v11', JSON.stringify(marcasFrota));
+        alert("Manutenção salva na nuvem!");
+        await carregarDadosDoSupabase();
         abrirEdicaoCaminhao(caminhao.id);
         renderizarResumoGeral();
     });
@@ -580,19 +586,15 @@ window.preencherEdicaoManutencao = function(idCaminhao, idManutencao) {
     document.getElementById('formAdicionarManutencao').scrollIntoView({ behavior: 'smooth' });
 };
 
-window.excluirManutencao = function(idCaminhao, idManutencao) {
+window.excluirManutencao = async function(idCaminhao, idManutencao) {
     if (!confirm("Deseja realmente excluir este registro de manutenção?")) return;
 
-    Object.keys(marcasFrota).forEach(m => {
-        const caminhao = marcasFrota[m].caminhoes.find(c => c.id === idCaminhao);
-        if (caminhao) {
-            caminhao.manutencoes = caminhao.manutencoes.filter(man => man.idManutencao !== idManutencao);
-            localStorage.setItem('frota_marcas_v11', JSON.stringify(marcasFrota));
-            alert("Manutenção excluída com sucesso!");
-            abrirEdicaoCaminhao(caminhao.id);
-            renderizarResumoGeral();
-        }
-    });
+    await supabaseClient.from('manutencoes').delete().eq('id_manutencao', idManutencao);
+
+    alert("Manutenção excluída da nuvem!");
+    await carregarDadosDoSupabase();
+    abrirEdicaoCaminhao(idCaminhao);
+    renderizarResumoGeral();
 };
 
 function renderizarGraficoManutencao(caminhao) {
@@ -624,30 +626,24 @@ function renderizarGraficoManutencao(caminhao) {
     });
 }
 
-formConta.addEventListener('submit', (e) => {
+formConta.addEventListener('submit', async (e) => {
     e.preventDefault();
     const idEditando = document.getElementById('contaId').value;
     const usuarioNovo = document.getElementById('contaUsuario').value.trim();
     const senhaNova = document.getElementById('contaSenha').value.trim();
 
-    if (idEditando) {
-        const conta = contasAcesso.find(c => c.id === parseInt(idEditando));
-        if (conta) {
-            conta.usuario = usuarioNovo;
-            conta.senha = senhaNova;
-            alert("Conta atualizada com sucesso!");
-        }
-    } else {
-        const novaConta = { id: Date.now(), usuario: usuarioNovo, senha: senhaNova };
-        contasAcesso.push(novaConta);
-        alert("Novo login criado com sucesso!");
-    }
+    const novaConta = {
+        id: idEditando ? parseInt(idEditando) : Date.now(),
+        usuario: usuarioNovo,
+        senha: senhaNova
+    };
 
-    localStorage.setItem('frota_contas_v2', JSON.stringify(contasAcesso));
+    await supabaseClient.from('contas_acesso').upsert([novaConta]);
+
+    alert("Conta salva na nuvem!");
     formConta.reset();
     document.getElementById('contaId').value = "";
-    document.getElementById('tituloFormConta').textContent = "🔑 Criar Novo Login de Acesso";
-    document.getElementById('btnSalvarConta').textContent = "Salvar Conta";
+    await carregarDadosDoSupabase();
     renderizarContas();
 });
 
@@ -682,19 +678,19 @@ window.editarConta = function(id) {
     formConta.scrollIntoView({ behavior: 'smooth' });
 };
 
-window.excluirConta = function(id) {
+window.excluirConta = async function(id) {
     if (contasAcesso.length <= 1) {
         alert("Você não pode excluir a última conta restante do sistema!");
         return;
     }
     if (!confirm("Deseja realmente excluir este login?")) return;
     
-    contasAcesso = contasAcesso.filter(c => c.id !== id);
-    localStorage.setItem('frota_contas_v2', JSON.stringify(contasAcesso));
+    await supabaseClient.from('contas_acesso').delete().eq('id', id);
+    await carregarDadosDoSupabase();
     renderizarContas();
 };
 
-formFuncionario.addEventListener('submit', (e) => {
+formFuncionario.addEventListener('submit', async (e) => {
     e.preventDefault();
     const idEditando = document.getElementById('funcId').value;
 
@@ -704,28 +700,22 @@ formFuncionario.addEventListener('submit', (e) => {
         cpf: document.getElementById('funcCpf').value,
         celular: document.getElementById('funcCelular').value,
         admissao: document.getElementById('funcAdmissao').value,
-        cnhCat: document.getElementById('funcCnhCat').value,
-        cnhValidade: document.getElementById('funcCnhValidade').value,
+        cnh_cat: document.getElementById('funcCnhCat').value,
+        cnh_validade: document.getElementById('funcCnhValidade').value,
         salario: parseFloat(document.getElementById('funcSalario').value) || 0,
-        feriasInicio: document.getElementById('funcFeriasInicio').value,
-        feriasFim: document.getElementById('funcFeriasFim').value,
-        afastamentoMotivo: document.getElementById('funcAfastamentoMotivo').value || "Nenhum",
-        afastamentoDias: parseInt(document.getElementById('funcAfastamentoDias').value) || 0,
+        ferias_inicio: document.getElementById('funcFeriasInicio').value,
+        ferias_fim: document.getElementById('funcFeriasFim').value,
+        afastamento_motivo: document.getElementById('funcAfastamentoMotivo').value || "Nenhum",
+        afastamento_dias: parseInt(document.getElementById('funcAfastamentoDias').value) || 0,
         atestados: document.getElementById('funcAtestados').value || "Nenhum"
     };
 
-    if (idEditando) {
-        const index = funcionarios.findIndex(f => f.id === parseInt(idEditando));
-        if (index !== -1) funcionarios[index] = novoFunc;
-        alert("Funcionário atualizado com sucesso!");
-    } else {
-        funcionarios.push(novoFunc);
-        alert("Funcionário cadastrado com sucesso!");
-    }
+    await supabaseClient.from('funcionarios').upsert([novoFunc]);
 
-    localStorage.setItem('frota_funcionarios_v3', JSON.stringify(funcionarios));
+    alert("Funcionário salvo na nuvem!");
     formFuncionario.reset();
     document.getElementById('funcId').value = "";
+    await carregarDadosDoSupabase();
     renderizarFuncionarios();
     renderizarResumoGeral();
 });
@@ -791,10 +781,10 @@ window.editarFuncionario = function(id) {
     formFuncionario.scrollIntoView({ behavior: 'smooth' });
 };
 
-window.excluirFuncionario = function(id) {
+window.excluirFuncionario = async function(id) {
     if (!confirm("Deseja realmente excluir este funcionário?")) return;
-    funcionarios = funcionarios.filter(f => f.id !== id);
-    localStorage.setItem('frota_funcionarios_v3', JSON.stringify(funcionarios));
+    await supabaseClient.from('funcionarios').delete().eq('id', id);
+    await carregarDadosDoSupabase();
     renderizarFuncionarios();
     renderizarResumoGeral();
 };
@@ -811,27 +801,40 @@ function carregarSelectParadaGeral() {
     });
 }
 
-formProgramarManutencaoAdmin.addEventListener('submit', (e) => {
+formProgramarManutencaoAdmin.addEventListener('submit', async (e) => {
     e.preventDefault();
     const idCaminhao = selectVeiculoParadaAdmin.value;
     const dataParada = document.getElementById('paradaDataAdmin').value;
     const motivoParada = document.getElementById('paradaMotivoAdmin').value;
 
-    let encontrado = false;
+    let caminhaoAlvo = null;
     Object.keys(marcasFrota).forEach(m => {
-        const caminhao = marcasFrota[m].caminhoes.find(c => c.id == idCaminhao);
-        if (caminhao) {
-            caminhao.paradaProgramada = { ativa: true, data: dataParada, motivo: motivoParada };
-            caminhao.status = "Parada Programada";
-            encontrado = true;
-        }
+        const achado = marcasFrota[m].caminhoes.find(c => c.id == idCaminhao);
+        if (achado) caminhaoAlvo = achado;
     });
 
-    if (encontrado) {
-        localStorage.setItem('frota_marcas_v11', JSON.stringify(marcasFrota));
-        alert("Parada programada com sucesso!");
+    if (caminhaoAlvo) {
+        caminhaoAlvo.paradaProgramada = { ativa: true, data: dataParada, motivo: motivoParada };
+        caminhaoAlvo.status = "Parada Programada";
+
+        await supabaseClient.from('caminhoes').upsert([{
+            id: caminhaoAlvo.id,
+            marca: caminhaoAlvo.marca,
+            modelo: caminhaoAlvo.modelo,
+            placa: caminhaoAlvo.placa,
+            status: caminhaoAlvo.status,
+            local_atual: caminhaoAlvo.localAtual,
+            motorista: caminhaoAlvo.motorista,
+            empresa_aluguel: caminhaoAlvo.empresaAluguel,
+            valor_aluguel_mensal: caminhaoAlvo.valorAluguelMensal,
+            foto: caminhaoAlvo.foto,
+            parada_programada: caminhaoAlvo.paradaProgramada
+        }]);
+
+        alert("Parada programada salva na nuvem!");
         formProgramarManutencaoAdmin.reset();
         switchAdminTab('veiculosTab');
+        await carregarDadosDoSupabase();
         renderizarTodosCaminhoesAdmin();
         renderBrands();
     }
@@ -924,7 +927,7 @@ window.carregarDadosFinanceiros = function(idCaminhao) {
     renderizarGraficoFinanceiroGeral(caminhao);
 };
 
-document.getElementById('formSalvarFinanceiro').addEventListener('submit', (e) => {
+document.getElementById('formSalvarFinanceiro').addEventListener('submit', async (e) => {
     e.preventDefault();
     const idCaminhao = document.getElementById('selectVeiculoFinanceiro').value;
 
@@ -938,8 +941,22 @@ document.getElementById('formSalvarFinanceiro').addEventListener('submit', (e) =
         caminhao.empresaAluguel = document.getElementById('finEmpresa').value;
         caminhao.valorAluguelMensal = parseFloat(document.getElementById('finValorMensal').value) || 0;
 
-        localStorage.setItem('frota_marcas_v11', JSON.stringify(marcasFrota));
-        alert("Dados de aluguel atualizados!");
+        await supabaseClient.from('caminhoes').upsert([{
+            id: caminhao.id,
+            marca: caminhao.marca,
+            modelo: caminhao.modelo,
+            placa: caminhao.placa,
+            status: caminhao.status,
+            local_atual: caminhao.localAtual,
+            motorista: caminhao.motorista,
+            empresa_aluguel: caminhao.empresaAluguel,
+            valor_aluguel_mensal: caminhao.valorAluguelMensal,
+            foto: caminhao.foto,
+            parada_programada: caminhao.paradaProgramada
+        }]);
+
+        alert("Dados financeiros salvos na nuvem!");
+        await carregarDadosDoSupabase();
         renderizarGraficoFinanceiroGeral(caminhao);
         renderizarResumoGeral();
     }
@@ -984,7 +1001,7 @@ function renderizarGraficoFinanceiroGeral(caminhao) {
     });
 }
 
-formNovoVeiculo.addEventListener('submit', (e) => {
+formNovoVeiculo.addEventListener('submit', async (e) => {
     e.preventDefault();
     const marcaEscolhida = document.getElementById('novoMarcaSelect').value;
 
@@ -995,22 +1012,20 @@ formNovoVeiculo.addEventListener('submit', (e) => {
         placa: document.getElementById('novoPlaca').value,
         foto: document.getElementById('novoFoto').value,
         status: document.getElementById('novoStatus').value,
-        localAtual: document.getElementById('novoLocal').value,
+        local_atual: document.getElementById('novoLocal').value,
         motorista: "Não informado",
-        empresaAluguel: "Não informada",
-        valorAluguelMensal: 0,
-        paradaProgramada: { ativa: false, data: "", motivo: "" },
-        manutencoes: [],
-        pecasDesgaste: ["Freios", "Óleo", "Pneus", "Filtros"],
-        valoresDesgaste: [10, 10, 10, 10]
+        empresa_aluguel: "Não informada",
+        valor_aluguel_mensal: 0,
+        parada_programada: { ativa: false, data: "", motivo: "" },
+        pecas_desgaste: ["Freios", "Óleo", "Pneus", "Filtros"],
+        valores_desgaste: [10, 10, 10, 10]
     };
 
-    if (!marcasFrota[marcaEscolhida]) marcasFrota[marcaEscolhida] = { caminhoes: [] };
-    marcasFrota[marcaEscolhida].caminhoes.push(novoCaminhao);
+    await supabaseClient.from('caminhoes').upsert([novoCaminhao]);
 
-    localStorage.setItem('frota_marcas_v11', JSON.stringify(marcasFrota));
-    alert("Veículo cadastrado com sucesso!");
+    alert("Veículo cadastrado na nuvem com sucesso!");
     formNovoVeiculo.reset();
+    await carregarDadosDoSupabase();
     renderBrands();
     renderizarTodosCaminhoesAdmin();
     carregarSelectFinanceiroGeral();
@@ -1032,4 +1047,5 @@ window.addEventListener('click', (e) => {
     if (e.target === brandTrucksModal) brandTrucksModal.classList.remove('active');
 });
 
-renderBrands();
+// Inicializa buscando os dados do Supabase ao abrir o site
+carregarDadosDoSupabase();
