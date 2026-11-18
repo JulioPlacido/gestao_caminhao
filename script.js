@@ -1,12 +1,12 @@
 // ==========================================
 // CONFIGURAÇÃO DO SUPABASE (Nuvem)
 // ==========================================
-const SUPABASE_URL = https://inycfnsqlfrbjjqntntf.supabase.co';
+const SUPABASE_URL = 'https://inycfnsqlfrbjjqntntf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_n3LZUyyX5ju5DDfkfhblzQ_jn-h_Hsk';
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Estrutura padrão inicial caso o banco venha vazio
+// Estrutura padrão inicial
 let marcasFrota = {
     "Volkswagen": {
         logo: "https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg",
@@ -67,12 +67,11 @@ async function carregarDadosDoSupabase() {
     try {
         // Buscar Caminhões
         const { data: dadosCaminhoes, error: errCaminhoes } = await supabaseClient.from('caminhoes').select('*');
-        if (!errCaminhoes && dadosCaminhoes) {
-            // Limpa e reorganiza nas marcas
+        
+        if (!errCaminhoes && dadosCaminhoes && dadosCaminhoes.length > 0) {
             Object.keys(marcasFrota).forEach(m => marcasFrota[m].caminhoes = []);
             
             for (let c of dadosCaminhoes) {
-                // Buscar manutenções de cada caminhão
                 const { data: dadosManut } = await supabaseClient
                     .from('manutencoes')
                     .select('*')
@@ -111,6 +110,40 @@ async function carregarDadosDoSupabase() {
                     marcasFrota[c.marca].caminhoes.push(caminhaoFormatado);
                 }
             }
+        } else {
+            // Se o banco estiver vazio, insere um caminhão padrão para não quebrar a tela
+            const caminhaoInicial = {
+                id: 101,
+                marca: "Volkswagen",
+                modelo: "VW Constellation 24.280",
+                placa: "VWX-1234",
+                status: "Alocado",
+                local_atual: "Centro de Distribuição - PE",
+                motorista: "José Carlos",
+                empresa_aluguel: "Logística Nordeste",
+                valor_aluguel_mensal: 8500.00,
+                foto: "https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&w=600&q=80",
+                parada_programada: { ativa: false, data: "", motivo: "" },
+                pecas_desgaste: ["Freios", "Óleo", "Pneus"],
+                valores_desgaste: [10, 10, 10]
+            };
+            await supabaseClient.from('caminhoes').upsert([caminhaoInicial]);
+            marcasFrota["Volkswagen"].caminhoes.push({
+                id: caminhaoInicial.id,
+                marca: caminhaoInicial.marca,
+                modelo: caminhaoInicial.modelo,
+                placa: caminhaoInicial.placa,
+                status: caminhaoInicial.status,
+                localAtual: caminhaoInicial.local_atual,
+                motorista: caminhaoInicial.motorista,
+                empresaAluguel: caminhaoInicial.empresa_aluguel,
+                valorAluguelMensal: caminhaoInicial.valor_aluguel_mensal,
+                foto: caminhaoInicial.foto,
+                paradaProgramada: caminhaoInicial.parada_programada,
+                manutencoes: [],
+                pecasDesgaste: caminhaoInicial.pecas_desgaste,
+                valoresDesgaste: caminhaoInicial.valores_desgaste
+            });
         }
 
         // Buscar Funcionários
@@ -142,6 +175,7 @@ async function carregarDadosDoSupabase() {
         renderBrands();
     } catch (erro) {
         console.error("Erro ao sincronizar com Supabase:", erro);
+        renderBrands(); // Renderiza mesmo se houver erro para não sumir a tela
     }
 }
 
@@ -149,6 +183,7 @@ async function carregarDadosDoSupabase() {
 // RENDERIZAÇÃO E INTERFACE
 // ==========================================
 function renderBrands() {
+    if (!brandsGrid) return;
     brandsGrid.innerHTML = "";
     Object.keys(marcasFrota).forEach(nomeMarca => {
         const dadosMarca = marcasFrota[nomeMarca];
@@ -484,7 +519,7 @@ function abrirEdicaoCaminhao(id) {
         </div>
 
         <div class="edit-section">
-            <h3>📜 Histórico de Manutenções (Permanente)</h3>
+            <h3>📜 Histórico de Manutenções</h3>
             <div id="listaHistoricoManutencoes">${historicoHtml}</div>
         </div>
 
@@ -508,7 +543,6 @@ function abrirEdicaoCaminhao(id) {
         caminhao.motorista = document.getElementById('editMotorista').value;
         caminhao.empresaAluguel = document.getElementById('editEmpresa').value;
 
-        // Salvar no Supabase
         await supabaseClient.from('caminhoes').upsert([{
             id: caminhao.id,
             marca: caminhao.marca,
