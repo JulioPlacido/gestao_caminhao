@@ -2,7 +2,7 @@
 // CONFIGURAÇÃO DO SUPABASE (Nuvem)
 // ==========================================
 const SUPABASE_URL = 'https://inycfnsqlfrbjjqntntf.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_n3LZUyyX5ju5DDfkfhblzQ_jn-h_Hsk';
+const SUPABASE_KEY = 'sb_publishable_n3LZUYyX5ju5DDfkfhblzQ_jn-h_Hsk';
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -110,40 +110,6 @@ async function carregarDadosDoSupabase() {
                     marcasFrota[c.marca].caminhoes.push(caminhaoFormatado);
                 }
             }
-        } else {
-            // Se o banco estiver vazio, insere um caminhão padrão para não quebrar a tela
-            const caminhaoInicial = {
-                id: 101,
-                marca: "Volkswagen",
-                modelo: "VW Constellation 24.280",
-                placa: "VWX-1234",
-                status: "Alocado",
-                local_atual: "Centro de Distribuição - PE",
-                motorista: "José Carlos",
-                empresa_aluguel: "Logística Nordeste",
-                valor_aluguel_mensal: 8500.00,
-                foto: "https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&w=600&q=80",
-                parada_programada: { ativa: false, data: "", motivo: "" },
-                pecas_desgaste: ["Freios", "Óleo", "Pneus"],
-                valores_desgaste: [10, 10, 10]
-            };
-            await supabaseClient.from('caminhoes').upsert([caminhaoInicial]);
-            marcasFrota["Volkswagen"].caminhoes.push({
-                id: caminhaoInicial.id,
-                marca: caminhaoInicial.marca,
-                modelo: caminhaoInicial.modelo,
-                placa: caminhaoInicial.placa,
-                status: caminhaoInicial.status,
-                localAtual: caminhaoInicial.local_atual,
-                motorista: caminhaoInicial.motorista,
-                empresaAluguel: caminhaoInicial.empresa_aluguel,
-                valorAluguelMensal: caminhaoInicial.valor_aluguel_mensal,
-                foto: caminhaoInicial.foto,
-                paradaProgramada: caminhaoInicial.parada_programada,
-                manutencoes: [],
-                pecasDesgaste: caminhaoInicial.pecas_desgaste,
-                valoresDesgaste: caminhaoInicial.valores_desgaste
-            });
         }
 
         // Buscar Funcionários
@@ -166,16 +132,18 @@ async function carregarDadosDoSupabase() {
             }));
         }
 
-        // Buscar Contas
+        // Buscar Contas (Garante que o login sempre funcione mesmo se a tabela estiver vazia)
         const { data: dadosContas, error: errContas } = await supabaseClient.from('contas_acesso').select('*');
         if (!errContas && dadosContas && dadosContas.length > 0) {
             contasAcesso = dadosContas;
+        } else {
+            await supabaseClient.from('contas_acesso').upsert([{ id: 1, usuario: "Marcelo Barros", senha: "1234" }]);
         }
 
         renderBrands();
     } catch (erro) {
         console.error("Erro ao sincronizar com Supabase:", erro);
-        renderBrands(); // Renderiza mesmo se houver erro para não sumir a tela
+        renderBrands();
     }
 }
 
@@ -781,7 +749,7 @@ function renderizarFuncionarios() {
         return `
             <div class="funcionario-card">
                 <p><strong>👤 Nome:</strong> ${f.nome} | <strong>CPF:</strong> ${f.cpf}</p>
-                <p><strong>📞 Celular:</strong> ${f.celular} | <strong>Admissão:</strong> ${f.admissao} | <strong>Salário:</strong> <span style="color:#34d399">R$ ${f.salario.toFixed(2)}</span></p>
+                <p><strong>📞 Celular:</strong> ${f.celular} | <strong>Admissao:</strong> ${f.admissao} | <strong>Salário:</strong> <span style="color:#34d399">R$ ${f.salario.toFixed(2)}</span></p>
                 <p><strong>🪪 CNH:</strong> Cat. ${f.cnhCat} | Validade: ${f.cnhValidade || 'Não informada'} ${alertaCnh}</p>
                 <p><strong>🏖️ Férias:</strong> ${f.feriasInicio ? `${f.feriasInicio} até ${f.feriasFim}` : 'Não agendadas'}</p>
                 <p><strong>🏥 Afastamento:</strong> ${f.afastamentoMotivo} (${f.afastamentoDias} dias) | <strong>Atestados:</strong> ${f.atestados}</p>
