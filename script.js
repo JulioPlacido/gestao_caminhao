@@ -1026,13 +1026,39 @@ formNovoVeiculo.addEventListener('submit', async (e) => {
     await supabaseClient.from('caminhoes').upsert([novoCaminhao]);
 
     alert("Veículo cadastrado na nuvem com sucesso!");
-    formNovoVeiculo.reset();
-    await carregarDadosDoSupabase();
-    renderBrands();
-    renderizarTodosCaminhoesAdmin();
-    carregarSelectFinanceiroGeral();
-    carregarSelectParadaGeral();
-    switchAdminTab('veiculosTab');
+    formNovoVeiculo.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const marcaEscolhida = document.getElementById('novoMarcaSelect').value;
+
+    const novoCaminhao = {
+        id: Date.now(),
+        marca: marcaEscolhida,
+        modelo: document.getElementById('novoModelo').value,
+        placa: document.getElementById('novoPlaca').value,
+        foto: document.getElementById('novoFoto').value || 'https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&w=600&q=80',
+        status: document.getElementById('novoStatus').value,
+        local_atual: document.getElementById('novoLocal').value,
+        motorista: "Não informado",
+        empresa_aluguel: "Não informada",
+        valor_aluguel_mensal: 0,
+        parada_programada: { ativa: false, data: "", motivo: "" }
+    };
+
+    const { error } = await supabaseClient.from('caminhoes').upsert([novoCaminhao]);
+
+    if (error) {
+        console.error("Erro ao salvar no Supabase:", error);
+        alert("Erro ao salvar: " + error.message);
+    } else {
+        alert("Veículo cadastrado na nuvem com sucesso!");
+        formNovoVeiculo.reset();
+        await carregarDadosDoSupabase();
+        renderBrands();
+        renderizarTodosCaminhoesAdmin();
+        carregarSelectFinanceiroGeral();
+        carregarSelectParadaGeral();
+        switchAdminTab('veiculosTab');
+    }
 });
 
 closeLogin.addEventListener('click', () => loginModal.classList.remove('active'));
