@@ -65,7 +65,6 @@ let graficoFinanceiroGeralInstance = null;
 // ==========================================
 async function carregarDadosDoSupabase() {
     try {
-        // Buscar Caminhões
         const { data: dadosCaminhoes, error: errCaminhoes } = await supabaseClient.from('caminhoes').select('*');
         
         if (!errCaminhoes && dadosCaminhoes && dadosCaminhoes.length > 0) {
@@ -106,13 +105,15 @@ async function carregarDadosDoSupabase() {
                     valoresDesgaste: c.valores_desgaste || []
                 };
 
-                if (marcasFrota[c.marca]) {
-                    marcasFrota[c.marca].caminhoes.push(caminhaoFormatado);
+                const marcaChave = Object.keys(marcasFrota).find(
+                    m => m.toLowerCase() === (c.marca || "").trim().toLowerCase()
+                );
+                if (marcaChave) {
+                    marcasFrota[marcaChave].caminhoes.push(caminhaoFormatado);
                 }
             }
         }
 
-        // Buscar Funcionários
         const { data: dadosFunc, error: errFunc } = await supabaseClient.from('funcionarios').select('*');
         if (!errFunc && dadosFunc) {
             funcionarios = dadosFunc.map(f => ({
@@ -132,7 +133,6 @@ async function carregarDadosDoSupabase() {
             }));
         }
 
-        // Buscar Contas (Garante que o login sempre funcione mesmo se a tabela estiver vazia)
         const { data: dadosContas, error: errContas } = await supabaseClient.from('contas_acesso').select('*');
         if (!errContas && dadosContas && dadosContas.length > 0) {
             contasAcesso = dadosContas;
@@ -511,7 +511,7 @@ function abrirEdicaoCaminhao(id) {
         caminhao.motorista = document.getElementById('editMotorista').value;
         caminhao.empresaAluguel = document.getElementById('editEmpresa').value;
 
-        await supabaseClient.from('caminhoes').upsert([{
+        const { error } = await supabaseClient.from('caminhoes').upsert([{
             id: caminhao.id,
             marca: caminhao.marca,
             modelo: caminhao.modelo,
@@ -524,6 +524,11 @@ function abrirEdicaoCaminhao(id) {
             foto: caminhao.foto,
             parada_programada: caminhao.paradaProgramada
         }]);
+
+        if (error) {
+            alert("ERRO AO ATUALIZAR: " + error.message);
+            return;
+        }
 
         alert("Atualizado na nuvem com sucesso!");
         await carregarDadosDoSupabase();
@@ -551,7 +556,12 @@ function abrirEdicaoCaminhao(id) {
             custo_mao_obra: parseFloat(document.getElementById('mCustoMao').value) || 0
         };
 
-        await supabaseClient.from('manutencoes').upsert([dadosManutencao]);
+        const { error } = await supabaseClient.from('manutencoes').upsert([dadosManutencao]);
+
+        if (error) {
+            alert("ERRO AO SALVAR MANUTENÇÃO: " + error.message);
+            return;
+        }
 
         alert("Manutenção salva na nuvem!");
         await carregarDadosDoSupabase();
@@ -591,7 +601,11 @@ window.preencherEdicaoManutencao = function(idCaminhao, idManutencao) {
 window.excluirManutencao = async function(idCaminhao, idManutencao) {
     if (!confirm("Deseja realmente excluir este registro de manutenção?")) return;
 
-    await supabaseClient.from('manutencoes').delete().eq('id_manutencao', idManutencao);
+    const { error } = await supabaseClient.from('manutencoes').delete().eq('id_manutencao', idManutencao);
+    if (error) {
+        alert("ERRO AO EXCLUIR: " + error.message);
+        return;
+    }
 
     alert("Manutenção excluída da nuvem!");
     await carregarDadosDoSupabase();
@@ -640,7 +654,11 @@ formConta.addEventListener('submit', async (e) => {
         senha: senhaNova
     };
 
-    await supabaseClient.from('contas_acesso').upsert([novaConta]);
+    const { error } = await supabaseClient.from('contas_acesso').upsert([novaConta]);
+    if (error) {
+        alert("ERRO AO SALVAR CONTA: " + error.message);
+        return;
+    }
 
     alert("Conta salva na nuvem!");
     formConta.reset();
@@ -687,7 +705,12 @@ window.excluirConta = async function(id) {
     }
     if (!confirm("Deseja realmente excluir este login?")) return;
     
-    await supabaseClient.from('contas_acesso').delete().eq('id', id);
+    const { error } = await supabaseClient.from('contas_acesso').delete().eq('id', id);
+    if (error) {
+        alert("ERRO AO EXCLUIR CONTA: " + error.message);
+        return;
+    }
+
     await carregarDadosDoSupabase();
     renderizarContas();
 };
@@ -703,16 +726,20 @@ formFuncionario.addEventListener('submit', async (e) => {
         celular: document.getElementById('funcCelular').value,
         admissao: document.getElementById('funcAdmissao').value,
         cnh_cat: document.getElementById('funcCnhCat').value,
-        cnh_validade: document.getElementById('funcCnhValidade').value,
+        cnh_validade: document.getElementById('funcCnhValidade').value || null,
         salario: parseFloat(document.getElementById('funcSalario').value) || 0,
-        ferias_inicio: document.getElementById('funcFeriasInicio').value,
-        ferias_fim: document.getElementById('funcFeriasFim').value,
+        ferias_inicio: document.getElementById('funcFeriasInicio').value || null,
+        ferias_fim: document.getElementById('funcFeriasFim').value || null,
         afastamento_motivo: document.getElementById('funcAfastamentoMotivo').value || "Nenhum",
         afastamento_dias: parseInt(document.getElementById('funcAfastamentoDias').value) || 0,
         atestados: document.getElementById('funcAtestados').value || "Nenhum"
     };
 
-    await supabaseClient.from('funcionarios').upsert([novoFunc]);
+    const { error } = await supabaseClient.from('funcionarios').upsert([novoFunc]);
+    if (error) {
+        alert("ERRO AO SALVAR FUNCIONÁRIO: " + error.message);
+        return;
+    }
 
     alert("Funcionário salvo na nuvem!");
     formFuncionario.reset();
@@ -749,7 +776,7 @@ function renderizarFuncionarios() {
         return `
             <div class="funcionario-card">
                 <p><strong>👤 Nome:</strong> ${f.nome} | <strong>CPF:</strong> ${f.cpf}</p>
-                <p><strong>📞 Celular:</strong> ${f.celular} | <strong>Admissao:</strong> ${f.admissao} | <strong>Salário:</strong> <span style="color:#34d399">R$ ${f.salario.toFixed(2)}</span></p>
+                <p><strong>📞 Celular:</strong> ${f.celular} | <strong>Admissão:</strong> ${f.admissao} | <strong>Salário:</strong> <span style="color:#34d399">R$ ${f.salario.toFixed(2)}</span></p>
                 <p><strong>🪪 CNH:</strong> Cat. ${f.cnhCat} | Validade: ${f.cnhValidade || 'Não informada'} ${alertaCnh}</p>
                 <p><strong>🏖️ Férias:</strong> ${f.feriasInicio ? `${f.feriasInicio} até ${f.feriasFim}` : 'Não agendadas'}</p>
                 <p><strong>🏥 Afastamento:</strong> ${f.afastamentoMotivo} (${f.afastamentoDias} dias) | <strong>Atestados:</strong> ${f.atestados}</p>
@@ -774,8 +801,8 @@ window.editarFuncionario = function(id) {
     document.getElementById('funcCnhCat').value = f.cnhCat || "Não possui";
     document.getElementById('funcCnhValidade').value = f.cnhValidade || "";
     document.getElementById('funcSalario').value = f.salario;
-    document.getElementById('funcFeriasInicio').value = f.feriasInicio;
-    document.getElementById('funcFeriasFim').value = f.feriasFim;
+    document.getElementById('funcFeriasInicio').value = f.feriasInicio || "";
+    document.getElementById('funcFeriasFim').value = f.feriasFim || "";
     document.getElementById('funcAfastamentoMotivo').value = f.afastamentoMotivo;
     document.getElementById('funcAfastamentoDias').value = f.afastamentoDias;
     document.getElementById('funcAtestados').value = f.atestados;
@@ -785,7 +812,12 @@ window.editarFuncionario = function(id) {
 
 window.excluirFuncionario = async function(id) {
     if (!confirm("Deseja realmente excluir este funcionário?")) return;
-    await supabaseClient.from('funcionarios').delete().eq('id', id);
+    const { error } = await supabaseClient.from('funcionarios').delete().eq('id', id);
+    if (error) {
+        alert("ERRO AO EXCLUIR FUNCIONÁRIO: " + error.message);
+        return;
+    }
+
     await carregarDadosDoSupabase();
     renderizarFuncionarios();
     renderizarResumoGeral();
@@ -819,7 +851,7 @@ formProgramarManutencaoAdmin.addEventListener('submit', async (e) => {
         caminhaoAlvo.paradaProgramada = { ativa: true, data: dataParada, motivo: motivoParada };
         caminhaoAlvo.status = "Parada Programada";
 
-        await supabaseClient.from('caminhoes').upsert([{
+        const { error } = await supabaseClient.from('caminhoes').upsert([{
             id: caminhaoAlvo.id,
             marca: caminhaoAlvo.marca,
             modelo: caminhaoAlvo.modelo,
@@ -832,6 +864,11 @@ formProgramarManutencaoAdmin.addEventListener('submit', async (e) => {
             foto: caminhaoAlvo.foto,
             parada_programada: caminhaoAlvo.paradaProgramada
         }]);
+
+        if (error) {
+            alert("ERRO AO SALVAR PARADA: " + error.message);
+            return;
+        }
 
         alert("Parada programada salva na nuvem!");
         formProgramarManutencaoAdmin.reset();
@@ -943,7 +980,7 @@ document.getElementById('formSalvarFinanceiro').addEventListener('submit', async
         caminhao.empresaAluguel = document.getElementById('finEmpresa').value;
         caminhao.valorAluguelMensal = parseFloat(document.getElementById('finValorMensal').value) || 0;
 
-        await supabaseClient.from('caminhoes').upsert([{
+        const { error } = await supabaseClient.from('caminhoes').upsert([{
             id: caminhao.id,
             marca: caminhao.marca,
             modelo: caminhao.modelo,
@@ -956,6 +993,11 @@ document.getElementById('formSalvarFinanceiro').addEventListener('submit', async
             foto: caminhao.foto,
             parada_programada: caminhao.paradaProgramada
         }]);
+
+        if (error) {
+            alert("ERRO AO SALVAR FINANCEIRO: " + error.message);
+            return;
+        }
 
         alert("Dados financeiros salvos na nuvem!");
         await carregarDadosDoSupabase();
@@ -1012,20 +1054,24 @@ formNovoVeiculo.addEventListener('submit', async (e) => {
         marca: marcaEscolhida,
         modelo: document.getElementById('novoModelo').value,
         placa: document.getElementById('novoPlaca').value,
-        foto: document.getElementById('novoFoto').value,
+        foto: document.getElementById('novoFoto').value || 'https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&w=600&q=80',
         status: document.getElementById('novoStatus').value,
         local_atual: document.getElementById('novoLocal').value,
         motorista: "Não informado",
         empresa_aluguel: "Não informada",
         valor_aluguel_mensal: 0,
-        parada_programada: { ativa: false, data: "", motivo: "" },
-        pecas_desgaste: ["Freios", "Óleo", "Pneus", "Filtros"],
-        valores_desgaste: [10, 10, 10, 10]
+        parada_programada: { ativa: false, data: "", motivo: "" }
     };
 
-    await supabaseClient.from('caminhoes').upsert([novoCaminhao]);
+    const { error } = await supabaseClient.from('caminhoes').insert([novoCaminhao]);
 
-    alert("Veículo cadastrado na nuvem com sucesso!");
+    if (error) {
+        alert("ERRO REAL DO SUPABASE: " + error.message);
+        console.error(error);
+        return;
+    }
+
+    alert("Veículo salvo de verdade na nuvem!");
     formNovoVeiculo.reset();
     await carregarDadosDoSupabase();
     renderBrands();
@@ -1049,5 +1095,4 @@ window.addEventListener('click', (e) => {
     if (e.target === brandTrucksModal) brandTrucksModal.classList.remove('active');
 });
 
-// Inicializa buscando os dados do Supabase ao abrir o site
 carregarDadosDoSupabase();
