@@ -2,7 +2,7 @@
 // CONFIGURAÇÃO DO SUPABASE (Nuvem)
 // ==========================================
 const SUPABASE_URL = 'https://inycfnsqlfrbjjqntntf.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_n3LZUYyX5ju5DDfkfhblzQ_jn-h_Hsk';
+const SUPABASE_KEY = 'sb_publishable_n3LZUyyX5ju5DDfkfhblzQ_jn-h_Hsk';
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
